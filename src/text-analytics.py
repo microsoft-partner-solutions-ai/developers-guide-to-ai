@@ -1,87 +1,74 @@
 # -------- IMPORT STATEMENTS --------
 import pandas as pd
-import os, uuid 
+import os 
 import requests
 import json
 from pandas import DataFrame
 from dotenv import load_dotenv 
-from azure.storage.blob import BlobServiceClient, BlobClient, ContainerClient
-from azure.storage.blob import BlobServiceClient, ResourceTypes, AccountSasPermissions, generate_account_sas
-from datetime import datetime, timedelta
+from azure.storage.blob import BlobServiceClient
+
 load_dotenv()
+
+# ------- ENV VARIABLES -------
+# Retrieve connection string for Azure Storage in Azure portal use 
+connect_str = os.getenv('AZURE_STORAGE_CONNECTION_STRING')
+endpoint = os.getenv('endpoint')
+subscription = os.getenv('subscription_key')
+
+# ------- OTHER VARIABLES ------
+headers = {"Ocp-Apim-Subscription-Key": subscription}
+keyphrase_url = endpoint + "/text/analytics/v3.0/keyphrases" 
+sentiment_url = endpoint + "/text/analytics/v3.0/sentiment" 
 
 # -------- FUNCTIONS ----------
 
 # Translates given string data into a JSON format; return appropriate request body needed to call API 
-def col_to_json(textdata):
+def text_to_json(textdata):
     documents = {"documents": [
     {"id": "1", "language": "en",
         "text": textdata}
     ]}
+
     return documents
 
-# Grabs Key Phrases from Text Analytics API call given the appropriate request body 
-def callKeyPhraseAndParse(documents):
+# Call to Text Analytics API to get either the Key Phrases or Sentiment 
+# Param: url, key value
+def call_text_analytics(documents, url, keyvalue):
     # Use Requests library to send the request body to the API
-    headers = {"Ocp-Apim-Subscription-Key": os.getenv('subscription_key')}
-    response = requests.post(keyphrase_url, headers=headers, json=documents)
-    key_phrases = response.json()
+    response = requests.post(url, headers=headers, json=documents)
+    info = response.json()
 
-    # Parse JSON response bodyto return the list of key phrases only 
+    # Parse JSON response body to return the list of key phrases or sentiment 
     for d in documents:
-        parseDict = key_phrases[d]
+        parseDict = info[d]
     for eachId in parseDict:
-        keyPhraseValues = eachId['keyPhrases']
-    return keyPhraseValues
+        resp = eachId[keyvalue]
+    return resp
 
-# Grabs Sentiment from Text Analaytics API call given the appropriate request body
-def callSentimentAndParse(documents):
-    # Use Requests library to send the request body to the API
-    headers = {"Ocp-Apim-Subscription-Key": os.getenv('subscription_key')}
-    response = requests.post(sentiment_url, headers=headers, json=documents)
-    sentiments = response.json()
-
-    # Parse JSON response body to return just the sentiments 
-    for d in documents:
-        parseDict = sentiments[d]
-    for eachId in parseDict:
-        sentimentValues = eachId['sentiment']
-    return sentimentValues
 
 # ------- Code Block ---------
 try:
-    # Retrieve connection string for Azure Storage in Azure portal use 
-    connect_str = os.getenv('AZURE_STORAGE_CONNECTION_STRING')
 
     # Create the BlobServiceClient object which will be used to create a container client
     blob_service_client = BlobServiceClient.from_connection_string(connect_str)
     
     # Pull in data from blob 
-    source = 'https://developersguidetrial.blob.core.windows.net/devguideblob/modifieddata.csv?sp=r&st=2020-08-25T23:36:01Z&se=2020-10-30T07:36:01Z&spr=https&sv=2019-12-12&sr=b&sig=JuOyO8VelYEWAX0Ot7rZG6ZPAMAzWbBVHF%2FJtbRjJ5E%3D'
-    df = pd.read_csv(source, dtype='unicode')
+    df = pd.read_csv(os.getenv('source'), dtype='unicode')
 
     # Parse out the text column from dataframe, dropping rows with NaN (empty rows)
     df = df.dropna()
 
-    # Working with a subset of the data 
-    df2 = df.head(10)
-    #print(df2)
-
     # ---------- KEY PHRASES ----------- #
     # Get Key Phrases from Text column of dataframe and insert them into a new column called Key Phrases 
-    keyphrase_url = os.getenv('endpoint') + "/text/analytics/v3.0/keyphrases" 
-    df2["Key Phrases"] = df2["Text"].apply(col_to_json).apply(callKeyPhraseAndParse)
-    # print(df2)
+    df["Key Phrases"] = df["Text"].apply(text_to_json).apply(call_text_analytics, args=(keyphrase_url, 'keyPhrases'))
 
     # ---------- SENTIMENT ----------- # 
     # Get Sentiment from Text column of dataframe and insert them into a new column called Sentiment  
-    sentiment_url = os.getenv('endpoint') + "/text/analytics/v3.0/sentiment" 
-    df2["Sentiment"] = df2["Text"].apply(col_to_json).apply(callSentimentAndParse)
-    print(df2)
+    df["Sentiment"] = df["Text"].apply(text_to_json).apply(call_text_analytics, args=(sentiment_url, 'sentiment'))
 
     # Write back to blob storage (.csv file)
-    df2.to_csv(r'C:\Users\dthakar\Documents\dev-guide\devguideblob\updateddata.csv', index=False)
-
+    df.to_csv("data-output.csv", index=False)
+    
 #Basic Exception Handling
 except Exception as ex:
     print('Exception:')
