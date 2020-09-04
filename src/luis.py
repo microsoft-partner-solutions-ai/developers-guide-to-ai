@@ -2,7 +2,6 @@
 from azure.cognitiveservices.language.luis.authoring import LUISAuthoringClient
 from azure.cognitiveservices.language.luis.runtime import LUISRuntimeClient
 from msrest.authentication import CognitiveServicesCredentials
-from functools import reduce
 import pandas as pd
 import numpy as np
 import json, time
@@ -24,7 +23,7 @@ versionId = "0.1"
 
 
 # Pull up data into data frame and drop rows with NaN (empty rows)
-data = pd.read_csv("data-output.csv")
+data = pd.read_csv("./data/data-output.csv")
 data = data.dropna()
 
 intents = []

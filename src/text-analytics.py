@@ -63,8 +63,8 @@ try:
     # Get Sentiment from Text column of dataframe and insert them into a new column called Sentiment  
     df["Sentiment"] = df["Text"].apply(text_to_json).apply(call_text_analytics, args=(sentiment_url, 'sentiment'))
 
-    # Write back to blob storage (.csv file)
-    df.to_csv("data-output.csv", index=False)
+    # Write data to file (.csv file)
+    df.to_csv("./data/data-output.csv", index=False)
     
 #Basic Exception Handling
 except Exception as ex:
