@@ -48,9 +48,6 @@ def call_text_analytics(documents, url, keyvalue):
 
 # ------- Code Block ---------
 try:
-
-    # Create the BlobServiceClient object which will be used to create a container client
-    blob_service_client = BlobServiceClient.from_connection_string(connect_str)
     
     # Pull in data from blob 
     df = pd.read_csv(os.getenv('source'), dtype='unicode')
